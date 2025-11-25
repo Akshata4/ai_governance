@@ -72,10 +72,34 @@ The server runs on `http://127.0.0.1:8000`.
 
 ## Usage
 
-1. Visit a supported LLM website (e.g., chat.openai.com)
-2. Start typing a prompt in the input field
-3. If sensitive data (emails, phones, SSNs, etc.) is detected, an alert will appear
-4. Check the browser console for debug logs
+### Using the Extension
+
+1. **Ensure the backend server is running**: Start the local detection server with `uv run python sensitive_check.py`. The server must be running on `http://127.0.0.1:8000` for the extension to function.
+
+2. **Verify the extension is loaded**: Confirm the "LLM Prompt Sensitive Data Checker" extension is enabled in Chrome at `chrome://extensions/`.
+
+3. **Visit a supported LLM website**: Navigate to one of the supported sites:
+   - ChatGPT (chat.openai.com or chatgpt.com)
+   - Claude (claude.ai)
+   - Bard (bard.google.com)
+
+4. **Locate the prompt input field**: Find the text input area where you enter your prompts (typically a textarea or contenteditable div).
+
+5. **Type or paste your prompt**: As you enter text, the extension monitors your input in real-time.
+
+6. **Sensitive data detection**:
+   - If sensitive information (such as emails, phone numbers, Social Security numbers, credit card numbers, or other PII) is detected, a red warning banner will appear above the input field with the message: "⚠️ Warning: Sensitive data detected in your prompt!"
+   - The warning automatically disappears after 5 seconds.
+   - If no sensitive data is found, no warning appears.
+
+7. **Debugging**: Open the browser console (F12 or right-click > Inspect > Console) to view debug logs from the extension, including server responses and any errors.
+
+### How It Works
+
+- The extension runs as a content script on supported websites, monitoring textarea, text input, and contenteditable elements.
+- On each input event (as you type), it sends the current text to the local server for analysis.
+- The server uses AI (via Ollama) to detect sensitive data, with regex patterns as a fallback.
+- All processing happens locally for privacy - no data is sent to external servers.
 
 ## Supported Websites
 
