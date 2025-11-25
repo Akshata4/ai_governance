@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "LLM Prompt Sensitive Data Checker",
+  "version": "1.0",
+  "description": "Checks prompts to LLMs for sensitive data",
+  "permissions": ["activeTab"],
+  "content_scripts": [
+    {
+      "matches": ["*://chat.openai.com/*", "*://claude.ai/*", "*://bard.google.com/*", "*://chatgpt.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
