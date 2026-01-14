@@ -1,5 +1,8 @@
 # AI Governance: LLM Prompt Sensitive Data Checker
 
+<img width="2848" height="1600" alt="image" src="https://github.com/user-attachments/assets/3eb9e454-ab5b-4c8f-a696-192ca4911e2b" />
+
+
 A system to detect sensitive data in prompts sent to LLMs, using a Chrome extension frontend and a local Ollama-powered backend.
 
 ## Features
