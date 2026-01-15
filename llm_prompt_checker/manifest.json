@@ -6,7 +6,7 @@
   "permissions": ["activeTab"],
   "content_scripts": [
     {
-      "matches": ["*://chat.openai.com/*", "*://claude.ai/*", "*://bard.google.com/*", "*://chatgpt.com/*"],
+      "matches": ["*://chat.openai.com/*", "*://claude.ai/*", "*://bard.google.com/*", "*://chatgpt.com/*", "*://www.perplexity.ai/*"],
       "js": ["content.js"]
     }
   ]

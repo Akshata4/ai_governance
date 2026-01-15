@@ -28,17 +28,44 @@ function showWarning(input, source = 'prompt', modifiedPrompt = null) {
   warning.appendChild(message);
 
   if (modifiedPrompt && source === 'prompt') {
+    const container = document.createElement('div');
+    container.style.cssText = `
+      display: flex;
+      align-items: center;
+      margin-top: 4px;
+    `;
+
     const modifiedDiv = document.createElement('div');
     modifiedDiv.style.cssText = `
       background-color: #f0f0f0;
+      color: black;
       padding: 4px 8px;
       border-radius: 4px;
       font-size: 12px;
-      margin-top: 4px;
       word-wrap: break-word;
+      flex: 1;
     `;
     modifiedDiv.textContent = `Suggested: ${modifiedPrompt}`;
-    warning.appendChild(modifiedDiv);
+
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy';
+    copyButton.style.cssText = `
+      margin-left: 8px;
+      padding: 2px 6px;
+      font-size: 10px;
+      background-color: #ddd;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      color: black;
+    `;
+    copyButton.addEventListener('click', () => {
+      navigator.clipboard.writeText(modifiedPrompt);
+    });
+
+    container.appendChild(modifiedDiv);
+    container.appendChild(copyButton);
+    warning.appendChild(container);
   }
 
   // Insert before the input
@@ -142,10 +169,6 @@ function monitorInputs() {
     }
   });
 }
-          }
-        }
-      });
-      inputObserver.observe(input, { childList: true, subtree: true });
 
       input.addEventListener('keydown', async function(event) {
         if (event.key === 'Enter') {
@@ -168,12 +191,6 @@ function monitorInputs() {
           await checkInput(input);
         }, 100);
       });
-
-
-    }
-  });
-}
-
 // Run immediately and observe for new elements
 monitorInputs();
 const observer = new MutationObserver(monitorInputs);
