@@ -14,8 +14,8 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for testing; restrict in production
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -34,11 +34,11 @@ def contains_sensitive_data_text(text):
     """
     try:
         response = ollama.chat(
-            model="llava:7b",
+            model="llama3",  # Use text-optimized model for text analysis
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a security expert. Determine if the following text contains sensitive information such as Social Security numbers, phone numbers, addresses,PAN card number, credit card numbers, bank account numbers, API keys, passwords, or other confidential data. Do NOT flag personal names or generic emails as sensitive. Answer only 'yes' or 'no'.",
+                    "content": "You are a security expert. Determine if the following text contains sensitive information such as Social Security numbers, phone numbers, addresses, PAN card number, credit card numbers, bank account numbers, API keys, passwords, or other confidential data. Do NOT flag personal names or generic emails as sensitive. Answer only 'yes' or 'no'.",
                 },
                 {"role": "user", "content": text},
             ],

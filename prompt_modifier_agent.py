@@ -10,7 +10,7 @@ def modify_prompt(text):
     """
     try:
         response = ollama.chat(
-            model="llava:7b",
+            model="llama3",  # Use text-optimized model for prompt modification
             messages=[
                 {
                     "role": "system",
