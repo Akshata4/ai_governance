@@ -1,132 +1,188 @@
-# AI Governance: LLM Prompt Sensitive Data Checker
+# AI Governance: LLM Prompt PII Blocker
 
 <img width="2848" height="1600" alt="image" src="https://github.com/user-attachments/assets/3eb9e454-ab5b-4c8f-a696-192ca4911e2b" />
 
-
-A system to detect sensitive data in prompts sent to LLMs, using a Chrome extension frontend and a local Ollama-powered backend.
+A Chrome extension that blocks sensitive data (PII, API keys, credentials) from being sent to browser-based LLMs. Works standalone with regex detection or can be enhanced with any OpenAI-compatible LLM API.
 
 ## Features
 
-- Real-time monitoring of LLM input fields and attachments (ChatGPT, Claude, Bard)
-- AI-powered sensitive data detection in text and images using local Ollama model
-- Intelligent prompt rewriting to remove sensitive data or provide safe alternatives
-- Fallback to regex patterns for text
-- Local server for privacy (no external API calls)
-
-## Prerequisites
-
-- Python 3.12 or higher
-- [uv](https://github.com/astral-sh/uv) package manager
-- [Ollama](https://ollama.ai/) installed and running
-- Google Chrome browser
-
-## Installation and Setup
-
-### 1. Install uv (if not already installed)
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Restart your terminal or source your shell profile.
-
-### 2. Clone or download the repository
-
-```bash
-git clone <repository-url>
-cd ai_governance
-```
-
-### 3. Install Python dependencies
-
-```bash
-uv sync
-```
-
-### 4. Install and setup Ollama
-
-- Download and install Ollama from [ollama.ai/download](https://ollama.ai/download)
-- Pull the required models:
-
-```bash
-ollama pull llama3
-ollama pull llava:7b
-```
-
-- Start the Ollama server:
-
-```bash
-ollama serve
-```
-
-### 5. Start the local detection server
-
-```bash
-uv run python main.py
-```
-
-The server runs on `http://127.0.0.1:8000`.
-
-### 6. Load the Chrome extension
-
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable "Developer mode" (toggle in top right)
-3. Click "Load unpacked"
-4. Select the `llm_prompt_checker` directory
-5. The extension is now active
-
-## Usage
-
-### Using the Extension
-
-1. **Ensure the backend server is running**: Start the local detection server with `uv run python sensitive_check.py`. The server must be running on `http://127.0.0.1:8000` for the extension to function.
-
-2. **Verify the extension is loaded**: Confirm the "LLM Prompt Sensitive Data Checker" extension is enabled in Chrome at `chrome://extensions/`.
-
-3. **Visit a supported LLM website**: Navigate to one of the supported sites:
-   - ChatGPT (chat.openai.com or chatgpt.com)
-   - Claude (claude.ai)
-   - Bard (bard.google.com)
-
-4. **Locate the prompt input field**: Find the text input area where you enter your prompts (typically a textarea or contenteditable div).
-
-5. **Type or paste your prompt and upload attachments**: As you enter text or upload images/files, the extension monitors your input and attachments in real-time.
-
-6. **Sensitive data detection**:
-   - If sensitive information (such as emails, phone numbers, Social Security numbers, credit card numbers, or other PII) is detected in the text or attachments, a red warning banner will appear above the input field with the message: "⚠️ Warning: Sensitive data detected in your prompt/attachment!"
-   - For text prompts, a "Use Suggested Prompt" button will appear, allowing you to replace the prompt with a rewritten version that removes sensitive data or redirects to official sources if needed.
-   - The warning automatically disappears after 10 seconds.
-   - If no sensitive data is found, no warning appears.
-
-7. **Debugging**: Open the browser console (F12 or right-click > Inspect > Console) to view debug logs from the extension, including server responses and any errors.
-
-### How It Works
-
-- The extension runs as a content script on supported websites, monitoring textarea, text input, contenteditable elements, and attached images.
-- On each input event (as you type or upload), it sends the current text and any image data (as base64) to the local server for analysis.
-- The server uses AI (via Ollama's llava model) to detect sensitive data in text and images, with regex patterns as a fallback for text.
-- All processing happens locally for privacy - no data is sent to external servers.
+- **Real-time blocking** of sensitive data before it reaches LLMs
+- **Comprehensive detection** for 20+ types of sensitive data:
+  - Personal: SSN, credit cards, phone numbers, PAN cards, routing numbers
+  - API Keys: AWS, GitHub, OpenAI, Anthropic, Stripe, Google, Slack, Discord, Twilio, SendGrid, Mailchimp, npm, PyPI
+  - Secrets: Private keys, JWT tokens, Bearer tokens, database connection strings
+- **Self-contained architecture** - works without any backend server
+- **Optional AI enhancement** - connect any OpenAI-compatible API (Ollama, LM Studio, vLLM) for nuanced detection
+- **Blocking overlay** with suggested redacted prompts
+- **Dark-themed settings UI** for easy configuration
+- **Multi-platform support** - ChatGPT, Claude, Perplexity, Gemini, Bard
 
 ## Supported Websites
 
-- chat.openai.com (ChatGPT)
+- chat.openai.com / chatgpt.com (ChatGPT)
 - claude.ai (Claude)
+- perplexity.ai / www.perplexity.ai (Perplexity)
+- gemini.google.com (Gemini)
 - bard.google.com (Bard)
 
-To add more sites, edit `llm_prompt_checker/manifest.json` and update the `matches` array.
+## Installation
+
+### Quick Start (Extension Only)
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd ai_governance
+   ```
+
+2. **Load the Chrome extension**
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" (toggle in top right)
+   - Click "Load unpacked"
+   - Select the `llm_prompt_checker` directory
+
+3. **Done!** The extension works immediately with regex-based detection.
+
+### Optional: Enable AI-Enhanced Detection
+
+For more nuanced detection, connect a self-hosted LLM:
+
+1. **Install Ollama** from [ollama.ai/download](https://ollama.ai/download)
+
+2. **Pull a model**
+   ```bash
+   ollama pull llama3
+   ```
+
+3. **Start Ollama server**
+   ```bash
+   ollama serve
+   ```
+
+4. **Configure the extension**
+   - Click the PII Blocker extension icon
+   - Enable "Use AI Detection"
+   - Set API Endpoint: `http://localhost:11434/v1/`
+   - Set Model Name: `llama3`
+   - Click "Test Connection" to verify
+   - Click "Save Settings"
+
+## Usage
+
+1. **Navigate to a supported LLM website** (ChatGPT, Claude, Perplexity, etc.)
+
+2. **Type your prompt** - The extension monitors all input
+
+3. **Press Enter or click Send** - The extension intercepts and checks for sensitive data
+
+4. **If sensitive data detected**:
+   - A blocking overlay appears
+   - Shows what type of data was detected
+   - Displays a suggested redacted version of your prompt
+   - Click "I Understand - Edit My Prompt" to dismiss and edit
+
+5. **If no sensitive data** - Your prompt is sent normally
+
+## Configuration
+
+Click the extension icon to access settings:
+
+| Setting | Description |
+|---------|-------------|
+| Enable Protection | Toggle PII blocking on/off |
+| Use AI Detection | Enable LLM-based detection (requires API) |
+| API Endpoint | OpenAI-compatible API URL (e.g., `http://localhost:11434/v1/`) |
+| API Key | Optional API key for authenticated endpoints |
+| Model Name | Model to use (e.g., `llama3`, `gpt-4`, `claude-3`) |
+
+## Detected Patterns
+
+### Personal Information
+- Social Security Numbers (XXX-XX-XXXX)
+- Credit Card Numbers (16 digits)
+- Phone Numbers
+- PAN Card Numbers (Indian)
+- Bank Routing Numbers
+
+### API Keys & Tokens
+- AWS Access Keys (AKIA...)
+- GitHub Tokens (ghp_, gho_, ghu_, ghs_, ghr_)
+- OpenAI API Keys (sk-...)
+- Anthropic API Keys (sk-ant-...)
+- Stripe Keys (sk_live_, sk_test_, pk_live_, pk_test_)
+- Google API Keys (AIza...)
+- Slack Tokens (xox...)
+- Discord Tokens
+- Twilio API Keys (SK...)
+- SendGrid API Keys (SG...)
+- Mailchimp API Keys
+- npm Tokens (npm_...)
+- PyPI Tokens (pypi-...)
+
+### Secrets & Credentials
+- Private Keys (RSA, DSA, EC, OPENSSH, PGP)
+- JWT Tokens
+- Bearer Tokens
+- Database Connection Strings (MongoDB, MySQL, PostgreSQL, Redis)
+- Generic API key patterns (api_key=, secret_key=, etc.)
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Chrome Extension                         │
+├─────────────────────────────────────────────────────────────┤
+│  content.js          │  background.js      │  popup.html    │
+│  - Intercepts Enter  │  - Regex detection  │  - Settings UI │
+│  - Intercepts clicks │  - LLM API calls    │  - Dark theme  │
+│  - Shows overlay     │  - Message handler  │                │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (optional)
+                    ┌─────────────────────┐
+                    │  OpenAI-Compatible  │
+                    │  API (Ollama, etc.) │
+                    └─────────────────────┘
+```
+
+## Optional: Legacy Backend Server
+
+A Python backend is included for advanced use cases (image analysis):
+
+```bash
+# Install dependencies
+uv sync
+
+# Pull models
+ollama pull llama3
+ollama pull llava:7b
+
+# Start server
+uv run python main.py
+```
+
+The server runs on `http://127.0.0.1:8000` and provides `/check` endpoint for text/image analysis.
 
 ## Troubleshooting
 
-- **Extension not working**: Ensure the server is running and accessible at localhost:8000
-- **Ollama errors**: Verify Ollama is installed and the model is pulled
-- **No alerts**: Check browser console for fetch errors; ensure the input element is detected
-- **Model issues**: Ensure both llama3 and llava:7b are pulled. If detection is not working, check server logs for model responses.
+| Issue | Solution |
+|-------|----------|
+| Extension not blocking | Ensure "Enable Protection" is on in settings |
+| AI detection not working | Verify Ollama is running and model is pulled |
+| Test connection fails | Check API URL ends with `/v1/` for Ollama |
+| No overlay appears | Check browser console for errors; refresh the page |
+| "Extension context invalidated" | Refresh the LLM page |
 
 ## Development
 
-- Modify detection logic in `main.py` and `attachment_agent.py`
-- Update extension scripts in `llm_prompt_checker/`
-- Reload the extension in Chrome after changes
+- **Extension files**: `llm_prompt_checker/`
+  - `manifest.json` - Extension configuration
+  - `content.js` - DOM interaction and event interception
+  - `background.js` - Detection logic and API calls
+  - `popup.html/js` - Settings UI
+- **Backend files** (optional): `main.py`, `attachment_agent.py`, `prompt_modifier_agent.py`
+
+To add more LLM sites, edit `llm_prompt_checker/manifest.json` and add URLs to the `matches` array.
 
 ## License
 
