@@ -147,9 +147,11 @@ Click the extension icon to access settings:
 
 ## Optional: Legacy Backend Server
 
-A Python backend is included for advanced use cases (image analysis):
+A Python backend is archived in `archive/python-backend/` for advanced use cases (image analysis):
 
 ```bash
+cd archive/python-backend
+
 # Install dependencies
 uv sync
 
@@ -180,7 +182,7 @@ The server runs on `http://127.0.0.1:8000` and provides `/check` endpoint for te
   - `content.js` - DOM interaction and event interception
   - `background.js` - Detection logic and API calls
   - `popup.html/js` - Settings UI
-- **Backend files** (optional): `main.py`, `attachment_agent.py`, `prompt_modifier_agent.py`
+- **Archived backend** (optional): `archive/python-backend/`
 
 To add more LLM sites, edit `llm_prompt_checker/manifest.json` and add URLs to the `matches` array.
 
