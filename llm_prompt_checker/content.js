@@ -1,181 +1,277 @@
-console.log('LLM Checker extension loaded on:', window.location.href);
+// LLM Prompt Sensitive Data Checker - Content Script
+let checking = false;
+let blockSubmission = false;
 
-function showWarning(input, source = 'prompt', modifiedPrompt = null) {
-  // Remove existing warning if any
-  const existing = input.parentNode.querySelector('.sensitive-warning');
+function showBlockingWarning(modifiedPrompt = null) {
+  const existing = document.querySelector('.pii-blocker-overlay');
   if (existing) existing.remove();
 
-  // Create warning div
-  const warning = document.createElement('div');
-  warning.className = 'sensitive-warning';
-  warning.style.cssText = `
-    background-color: #ff4444;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: bold;
-    margin-bottom: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    z-index: 10000;
+  const overlay = document.createElement('div');
+  overlay.className = 'pii-blocker-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 9999999;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    justify-content: center;
+    align-items: center;
   `;
 
+  const warningBox = document.createElement('div');
+  warningBox.style.cssText = `
+    background-color: #ff4444;
+    color: white;
+    padding: 32px 48px;
+    border-radius: 16px;
+    font-size: 18px;
+    font-weight: bold;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    max-width: 600px;
+    text-align: center;
+  `;
+
+  const icon = document.createElement('div');
+  icon.style.cssText = 'font-size: 64px; margin-bottom: 16px;';
+  icon.textContent = '🚫';
+  warningBox.appendChild(icon);
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size: 24px; margin-bottom: 16px;';
+  title.textContent = 'SUBMISSION BLOCKED';
+  warningBox.appendChild(title);
+
   const message = document.createElement('div');
-  message.textContent = `⚠️ Warning: Sensitive data detected in your ${source}!`;
-  warning.appendChild(message);
+  message.style.cssText = 'font-size: 16px; margin-bottom: 24px; font-weight: normal;';
+  message.textContent = 'Sensitive/confidential data detected in your prompt. This data cannot be sent to the LLM.';
+  warningBox.appendChild(message);
 
-  if (modifiedPrompt && source === 'prompt') {
-    const modifiedDiv = document.createElement('div');
-    modifiedDiv.style.cssText = `
-      background-color: #f0f0f0;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      margin-top: 4px;
-      word-wrap: break-word;
+  if (modifiedPrompt) {
+    const suggestedDiv = document.createElement('div');
+    suggestedDiv.style.cssText = `
+      background-color: #e8f5e9;
+      color: #1b5e20;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: normal;
+      margin-bottom: 24px;
+      text-align: left;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 2px solid #4caf50;
     `;
-    modifiedDiv.textContent = `Suggested: ${modifiedPrompt}`;
-    warning.appendChild(modifiedDiv);
+    suggestedDiv.innerHTML = '<strong style="color: #2e7d32;">Suggested prompt:</strong><br>' + modifiedPrompt;
+    warningBox.appendChild(suggestedDiv);
   }
 
-  // Insert before the input
-  input.parentNode.insertBefore(warning, input);
+  const dismissBtn = document.createElement('button');
+  dismissBtn.style.cssText = `
+    background-color: white;
+    color: #ff4444;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  `;
+  dismissBtn.textContent = 'I Understand - Edit My Prompt';
+  dismissBtn.onclick = () => {
+    overlay.remove();
+    blockSubmission = false;
+    clearPromptInput();
+  };
+  warningBox.appendChild(dismissBtn);
 
-  // Auto-hide after 10 seconds if no action
-  setTimeout(() => {
-    if (warning.parentNode) warning.remove();
-  }, 10000);
+  overlay.appendChild(warningBox);
+  document.body.appendChild(overlay);
+  blockSubmission = true;
 }
 
-// Monitor input elements for LLM prompts
-async function checkSensitiveData(text, imageData = null) {
-  try {
-    const payload = { text };
-    if (imageData) {
-      payload.image = imageData;
+function clearPromptInput() {
+  const selectors = ['#prompt-textarea', '.ProseMirror', '[contenteditable="true"]', 'textarea'];
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      if (el.value !== undefined) {
+        el.value = '';
+      } else {
+        el.textContent = '';
+        el.innerHTML = '';
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      break;
     }
-    const response = await fetch('http://127.0.0.1:8000/check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const result = await response.json();
-    console.log('Server response:', result, 'for payload:', payload);
-    return result;
-  } catch (error) {
-    console.error('Error checking sensitive data:', error);
-    return { sensitive: false, modified_prompt: null }; // Fallback
   }
 }
 
-async function getImageData(input) {
-  const imgs = input.querySelectorAll('img');
-  console.log('Found imgs in input:', imgs.length);
-  if (imgs.length > 0) {
-    // For simplicity, take the first image's src
-    const img = imgs[0];
-    const src = img.src;
-    console.log('Img src starts with:', src.substring(0, 20));
-    if (src.startsWith('data:image/')) {
-      // Extract base64
-      return src.split(',')[1];
-    } else if (src.startsWith('blob:')) {
-      // Fetch blob and convert to base64
-      try {
-        const response = await fetch(src);
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) {
-        console.error('Error fetching blob:', e);
-        return null;
+// Use Chrome messaging to communicate with background script
+async function checkSensitiveData(text) {
+  return new Promise((resolve) => {
+    // Check if chrome.runtime is available (extension context may be invalidated)
+    if (!chrome?.runtime?.sendMessage) {
+      console.warn('PII Checker: Extension context invalidated. Please refresh the page.');
+      resolve({ sensitive: false, modified_prompt: null });
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(
+        { action: 'checkSensitiveData', text: text },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('PII Checker: Message error', chrome.runtime.lastError);
+            resolve({ sensitive: false, modified_prompt: null });
+          } else {
+            resolve(response || { sensitive: false, modified_prompt: null });
+          }
+        }
+      );
+    } catch (error) {
+      console.error('PII Checker: Error sending message', error);
+      resolve({ sensitive: false, modified_prompt: null });
+    }
+  });
+}
+
+function getPromptText() {
+  const selectors = [
+    '#prompt-textarea',
+    '[data-id="root"] textarea',
+    '.ProseMirror',
+    '[contenteditable="true"]',
+    '[enterkeyhint="enter"]',
+    'textarea',
+  ];
+
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const text = el.value || el.textContent || el.innerText;
+      if (text && text.trim()) {
+        return text.trim();
       }
     }
   }
-  return null;
+  return '';
 }
 
-async function checkInput(input) {
-  const text = input.tagName === 'TEXTAREA' || input.type === 'text' ? input.value : input.textContent;
-  const imageData = await getImageData(input);
-  console.log('Checking input, text length:', text.length, 'image:', imageData ? 'yes (' + imageData.substring(0, 20) + '...)' : 'no');
-  const source = imageData ? 'attachment' : 'prompt';
-  const result = await checkSensitiveData(text, imageData);
-  if (result.sensitive) {
-    showWarning(input, source, result.modified_prompt);
+function isSendButton(element) {
+  if (!element) return false;
+  const btn = element.closest('button') || (element.tagName === 'BUTTON' ? element : null);
+  if (!btn) return false;
+
+  const testId = btn.getAttribute('data-testid') || '';
+  const ariaLabel = btn.getAttribute('aria-label') || '';
+  const className = btn.className || '';
+
+  if (testId.includes('send') || testId.includes('submit')) return true;
+  if (ariaLabel.toLowerCase().includes('send')) return true;
+  if (className.includes('send') || className.includes('submit')) return true;
+
+  const hasSvg = btn.querySelector('svg');
+  const isNearTextarea = document.querySelector('#prompt-textarea, .ProseMirror, textarea');
+  if (hasSvg && isNearTextarea && btn.type !== 'button') return true;
+
+  return false;
+}
+
+// Intercept Enter key
+document.addEventListener('keydown', async function(event) {
+  if (blockSubmission) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return false;
   }
-}
 
-function monitorInputs() {
-  const inputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-  console.log('Found inputs:', inputs.length);
-  inputs.forEach((input, index) => {
-    console.log(`Monitoring input ${index}:`, input.tagName, input.className);
-    if (!input.hasAttribute('data-monitored')) {
-      input.setAttribute('data-monitored', 'true');
+  if (event.key !== 'Enter' || event.shiftKey) return;
 
-      let checking = false;
-      input.addEventListener('keydown', async function(event) {
-        if (checking) return;
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          checking = true;
-          const text = input.tagName === 'TEXTAREA' || input.type === 'text' ? input.value : input.textContent;
-          const result = await checkSensitiveData(text);
-          checking = false;
-          if (result.sensitive) {
-            showWarning(input, 'prompt', result.modified_prompt);
-          } else {
-            // Allow submission by re-dispatching the event
-            input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
-          }
-        }
-      });
+  const target = event.target;
+  const isInput = target.tagName === 'TEXTAREA' ||
+                  target.tagName === 'INPUT' ||
+                  target.isContentEditable ||
+                  target.closest('[contenteditable="true"]') ||
+                  target.closest('.ProseMirror');
 
-    }
-  });
-}
-          }
-        }
-      });
-      inputObserver.observe(input, { childList: true, subtree: true });
+  if (!isInput) return;
 
-      input.addEventListener('keydown', async function(event) {
-        if (event.key === 'Enter') {
-          const text = input.tagName === 'TEXTAREA' || input.type === 'text' ? input.value : input.textContent;
-          const imageData = await getImageData(input);
-          const source = imageData ? 'attachment' : 'prompt';
-          const result = await checkSensitiveData(text, imageData);
-          if (result.sensitive) {
-            event.preventDefault();
-            showWarning(input, source, result.modified_prompt);
-          }
-        }
-      });
+  event.preventDefault();
+  event.stopImmediatePropagation();
 
-      // Also listen for paste events to catch image pastes
-      input.addEventListener('paste', async function() {
-        console.log('Paste event triggered');
-        // Wait a bit for the image to be inserted
-        setTimeout(async () => {
-          await checkInput(input);
-        }, 100);
-      });
+  if (checking) return;
+  checking = true;
 
+  const text = getPromptText();
+  if (!text) {
+    checking = false;
+    return;
+  }
 
-    }
-  });
-}
+  const result = await checkSensitiveData(text);
+  checking = false;
 
-// Run immediately and observe for new elements
-monitorInputs();
-const observer = new MutationObserver(monitorInputs);
-observer.observe(document.body, { childList: true, subtree: true });
+  if (result.sensitive) {
+    showBlockingWarning(result.modified_prompt);
+  } else {
+    const sendBtn = document.querySelector('button[data-testid="send-button"]') ||
+                    document.querySelector('button[data-testid="composer-send-button"]') ||
+                    document.querySelector('button[aria-label*="Send"]') ||
+                    document.querySelector('form button[type="submit"]') ||
+                    document.querySelector('button svg')?.closest('button');
+    if (sendBtn) sendBtn.click();
+  }
+}, true);
 
+// Intercept send button clicks
+document.addEventListener('click', async function(event) {
+  const target = event.target;
+
+  // Allow clicks inside our overlay (dismiss button)
+  if (target.closest('.pii-blocker-overlay')) {
+    return; // Let the click through
+  }
+
+  if (blockSubmission) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return false;
+  }
+  const sendButton = isSendButton(target) ? (target.closest('button') || target) : null;
+  if (!sendButton) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  if (checking) return;
+  checking = true;
+
+  const text = getPromptText();
+  if (!text) {
+    checking = false;
+    sendButton.click();
+    return;
+  }
+
+  const result = await checkSensitiveData(text);
+  checking = false;
+
+  if (result.sensitive) {
+    showBlockingWarning(result.modified_prompt);
+  } else {
+    blockSubmission = false;
+    setTimeout(() => sendButton.click(), 10);
+  }
+}, true);
+
+// Intercept form submissions
+document.addEventListener('submit', function(event) {
+  if (blockSubmission) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return false;
+  }
+}, true);

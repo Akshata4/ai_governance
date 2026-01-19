@@ -1,12 +1,28 @@
 {
   "manifest_version": 3,
-  "name": "LLM Prompt Sensitive Data Checker",
+  "name": "LLM Prompt PII Blocker",
   "version": "1.0",
-  "description": "Checks prompts to LLMs for sensitive data",
-  "permissions": ["activeTab"],
+  "description": "Blocks sensitive/confidential data from being sent to LLMs",
+  "permissions": ["activeTab", "storage", "http://localhost/*", "127.0.0.1/*"],
+  "host_permissions": ["<all_urls>", "http://localhost/*", "127.0.0.1/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PII Blocker Settings"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["*://chat.openai.com/*", "*://claude.ai/*", "*://bard.google.com/*", "*://chatgpt.com/*"],
+      "matches": [
+        "*://chat.openai.com/*",
+        "*://claude.ai/*",
+        "*://bard.google.com/*",
+        "*://chatgpt.com/*",
+        "*://www.perplexity.ai/*",
+        "*://perplexity.ai/*",
+        "*://gemini.google.com/*"
+      ],
       "js": ["content.js"]
     }
   ]

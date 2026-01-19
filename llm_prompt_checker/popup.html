@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 380px;
+      min-height: 500px;
+      background: #1a1a1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #fff;
+      padding: 24px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 32px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #888;
+      font-size: 13px;
+    }
+    .card {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .card-icon.warning {
+      background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+    }
+    .card-icon.settings {
+      background: linear-gradient(135deg, #2196F3, #1976D2);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .card-desc {
+      font-size: 12px;
+      color: #888;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #333;
+    }
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+    .toggle-label {
+      font-size: 14px;
+    }
+    .toggle-sublabel {
+      font-size: 11px;
+      color: #666;
+      margin-top: 2px;
+    }
+    .toggle {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      display: inline-block;
+    }
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .toggle label {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #444;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+    .toggle label:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    .toggle input:checked + label {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+    }
+    .toggle input:checked + label:before {
+      transform: translateX(22px);
+    }
+    .llm-config {
+      display: none;
+      margin-top: 16px;
+    }
+    .llm-config.active {
+      display: block;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 6px;
+      margin-top: 12px;
+    }
+    label:first-child {
+      margin-top: 0;
+    }
+    input[type="text"], input[type="password"], input[type="url"], select {
+      width: 100%;
+      padding: 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+    select {
+      cursor: pointer;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, opacity 0.2s;
+      margin-top: 8px;
+    }
+    .btn:hover {
+      opacity: 0.9;
+      transform: scale(0.98);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      color: white;
+    }
+    .btn-secondary {
+      background: #333;
+      color: #fff;
+    }
+    .status {
+      text-align: center;
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 12px;
+      font-size: 13px;
+      display: none;
+    }
+    .status.success {
+      display: block;
+      background: rgba(76, 175, 80, 0.2);
+      color: #4CAF50;
+    }
+    .status.error {
+      display: block;
+      background: rgba(244, 67, 54, 0.2);
+      color: #f44336;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: #333;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .feature-icon {
+      font-size: 20px;
+    }
+    .feature-text {
+      font-size: 13px;
+    }
+    .feature-text span {
+      display: block;
+      font-size: 11px;
+      color: #666;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🛡️</div>
+    <h1>PII Blocker</h1>
+    <p class="subtitle">Protect sensitive data from LLMs</p>
+  </div>
+
+  <div class="card">
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Enable Protection</div>
+        <div class="toggle-sublabel">Block sensitive data from being sent</div>
+      </div>
+      <div class="toggle">
+        <input type="checkbox" id="enabled" checked>
+        <label for="enabled"></label>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Use AI Detection</div>
+        <div class="toggle-sublabel">Enhanced detection with self-hosted LLM</div>
+      </div>
+      <div class="toggle">
+        <input type="checkbox" id="useLlm">
+        <label for="useLlm"></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card llm-config" id="llmConfig">
+    <div class="card-header">
+      <div class="card-icon settings">⚙️</div>
+      <div>
+        <div class="card-title">LLM Configuration</div>
+        <div class="card-desc">Connect your self-hosted AI</div>
+      </div>
+    </div>
+
+    <label>API Endpoint (OpenAI Compatible)</label>
+    <input type="url" id="apiUrl" placeholder="http://localhost:11434/v1/chat/completions">
+
+    <label>API Key (optional)</label>
+    <input type="password" id="apiKey" placeholder="Leave empty for local LLMs">
+
+    <label>Model Name</label>
+    <input type="text" id="modelName" placeholder="llama3">
+
+    <button class="btn btn-secondary" id="testBtn">Test Connection</button>
+  </div>
+
+  <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+
+  <div class="status" id="status"></div>
+
+  <div style="margin-top: 20px;">
+    <div class="feature">
+      <span class="feature-icon">🔍</span>
+      <div class="feature-text">
+        Regex Detection
+        <span>SSN, Credit Cards, Phone Numbers, API Keys</span>
+      </div>
+    </div>
+    <div class="feature">
+      <span class="feature-icon">🤖</span>
+      <div class="feature-text">
+        AI Detection (Optional)
+        <span>Any OpenAI-compatible API (Ollama, LM Studio, vLLM)</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
