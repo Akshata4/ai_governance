@@ -4,26 +4,135 @@
 let settings = {
   enabled: true,
   useLlm: false,
-  apiUrl: 'http://localhost:11434/v1/chat/completions',
+  apiUrl: 'http://localhost:11434/v1',
   apiKey: '',
   modelName: 'llama3'
 };
 
+// Default metrics
+let metrics = {
+  totalPromptsChecked: 0,
+  totalPiiDetected: 0,
+  piiByType: {},
+  platformUsage: {},
+  blockedSubmissions: 0,
+  lastDetectionTime: null,
+  sessionStart: Date.now()
+};
+
+// Track if settings are loaded
+let settingsLoaded = false;
+let settingsLoadPromise = null;
+
 // Load settings on startup
-chrome.storage.sync.get(settings, (items) => {
-  settings = items;
+function loadSettings() {
+  if (settingsLoadPromise) {
+    return settingsLoadPromise;
+  }
+
+  settingsLoadPromise = new Promise((resolve) => {
+    chrome.storage.sync.get(settings, (items) => {
+      settings = items;
+      settingsLoaded = true;
+      console.log('[PII Blocker] Settings loaded on startup:', {
+        enabled: settings.enabled,
+        useLlm: settings.useLlm,
+        apiUrl: settings.apiUrl,
+        modelName: settings.modelName,
+        hasApiKey: !!settings.apiKey
+      });
+      resolve(settings);
+    });
+  });
+
+  return settingsLoadPromise;
+}
+
+// Load metrics on startup
+chrome.storage.local.get({ metrics: metrics }, (items) => {
+  metrics = items.metrics;
+  // Reset session start for new session
+  metrics.sessionStart = Date.now();
 });
+
+// Initialize settings
+loadSettings();
+
+// Save metrics to storage
+function saveMetrics() {
+  chrome.storage.local.set({ metrics: metrics });
+}
+
+// Update metrics when PII is detected
+function updateMetrics(detected, piiType = null, platform = null) {
+  metrics.totalPromptsChecked++;
+
+  // Track platform usage
+  if (platform) {
+    metrics.platformUsage[platform] = (metrics.platformUsage[platform] || 0) + 1;
+  }
+
+  if (detected) {
+    metrics.totalPiiDetected++;
+    metrics.blockedSubmissions++;
+    metrics.lastDetectionTime = Date.now();
+
+    if (piiType) {
+      metrics.piiByType[piiType] = (metrics.piiByType[piiType] || 0) + 1;
+    }
+  }
+
+  saveMetrics();
+}
 
 // Listen for settings updates
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'settingsUpdated') {
     settings = request.settings;
+    settingsLoaded = true;
+    settingsLoadPromise = null; // Reset promise so next load gets fresh data
+    console.log('[PII Blocker] Settings updated:', {
+      enabled: settings.enabled,
+      useLlm: settings.useLlm,
+      apiUrl: settings.apiUrl,
+      modelName: settings.modelName,
+      hasApiKey: !!settings.apiKey
+    });
     sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'getMetrics') {
+    sendResponse({ success: true, metrics: metrics });
+    return true;
+  }
+
+  if (request.action === 'resetMetrics') {
+    metrics = {
+      totalPromptsChecked: 0,
+      totalPiiDetected: 0,
+      piiByType: {},
+      platformUsage: {},
+      blockedSubmissions: 0,
+      lastDetectionTime: null,
+      sessionStart: Date.now()
+    };
+    saveMetrics();
+    sendResponse({ success: true, metrics: metrics });
     return true;
   }
 
   if (request.action === 'testConnection') {
     testLlmConnection(request.url, request.apiKey, request.model)
+      .then(result => sendResponse(result))
+      .catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // Keep channel open for async response
+  }
+
+  if (request.action === 'testChatCompletion') {
+    testChatCompletion(request.apiUrl, request.apiKey, request.model)
       .then(result => sendResponse(result))
       .catch(error => {
         sendResponse({ success: false, error: error.message });
@@ -37,7 +146,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
     }
 
-    checkSensitiveData(request.text)
+    checkSensitiveData(request.text, request.platform)
       .then(result => sendResponse(result))
       .catch(error => {
         console.error('Background: Check error', error);
@@ -140,14 +249,45 @@ function redactSensitiveData(text) {
   return redacted;
 }
 
+// Normalize API URL to ensure it ends with /chat/completions
+function getChatCompletionsUrl(baseUrl) {
+  let url = baseUrl.trim();
+  // Remove trailing slash
+  url = url.replace(/\/+$/, '');
+  // If it already ends with /chat/completions, return as is
+  if (url.endsWith('/chat/completions')) {
+    return url;
+  }
+  // If it ends with /v1, append /chat/completions
+  if (url.endsWith('/v1')) {
+    return url + '/chat/completions';
+  }
+  // Otherwise append /chat/completions
+  return url + '/chat/completions';
+}
+
 // Check using LLM (OpenAI compatible format)
 async function checkWithLlm(text) {
   const systemPrompt = `You are a security expert. Determine if the following text contains sensitive information such as Social Security numbers, phone numbers, addresses, PAN card numbers, credit card numbers, bank account numbers, API keys, passwords, or other confidential data. Do NOT flag personal names or generic emails as sensitive. Answer only 'yes' or 'no'.`;
 
+  console.log('[PII Blocker] checkWithLlm called:', {
+    apiKeyType: typeof settings.apiKey,
+    apiKeyValue: settings.apiKey,
+    apiKeyLength: settings.apiKey ? settings.apiKey.length : 0,
+    isEmpty: !settings.apiKey || settings.apiKey.trim().length === 0,
+    apiUrl: settings.apiUrl,
+    modelName: settings.modelName
+  });
+
   let headers = { 'Content-Type': 'application/json' };
 
-  if (settings.apiKey) {
+  // Only add Authorization header if API key exists and is not empty
+  // Note: Ollama does not require auth and will reject requests with Authorization header (403)
+  if (settings.apiKey && typeof settings.apiKey === 'string' && settings.apiKey.trim().length > 0) {
+    console.log('[PII Blocker] checkWithLlm: Adding Authorization header');
     headers['Authorization'] = `Bearer ${settings.apiKey}`;
+  } else {
+    console.log('[PII Blocker] checkWithLlm: Skipping Authorization header (Ollama mode)');
   }
 
   const body = JSON.stringify({
@@ -160,13 +300,28 @@ async function checkWithLlm(text) {
     temperature: 0
   });
 
-  const response = await fetch(settings.apiUrl, {
+  const apiUrl = getChatCompletionsUrl(settings.apiUrl);
+  console.log('[PII Blocker] Calling LLM API:', {
+    url: apiUrl,
+    hasAuth: !!headers['Authorization'],
+    model: settings.modelName
+  });
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: headers,
     body: body
   });
 
   if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unable to read error response');
+    console.error('[PII Blocker] LLM API error:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: apiUrl,
+      errorBody: errorText,
+      hasAuth: !!headers['Authorization']
+    });
     throw new Error(`LLM API error: ${response.status}`);
   }
 
@@ -185,10 +340,25 @@ async function getModifiedPrompt(text) {
 
   const systemPrompt = `You are a prompt sanitizer. Rewrite the user's prompt to remove any sensitive data. If the request can be fulfilled without the sensitive information, rewrite it without the data. If the sensitive data is essential, politely ask the user to use official services instead. Keep the rewrite concise. Do not include any sensitive data in your response.`;
 
+  console.log('[PII Blocker] getModifiedPrompt called:', {
+    apiKeyType: typeof settings.apiKey,
+    apiKeyValue: settings.apiKey,
+    apiKeyLength: settings.apiKey ? settings.apiKey.length : 0,
+    isEmpty: !settings.apiKey || settings.apiKey.trim().length === 0,
+    apiUrl: settings.apiUrl,
+    modelName: settings.modelName,
+    useLlm: settings.useLlm
+  });
+
   let headers = { 'Content-Type': 'application/json' };
 
-  if (settings.apiKey) {
+  // Only add Authorization header if API key exists and is not empty
+  // Note: Ollama does not require auth and will reject requests with Authorization header (403)
+  if (settings.apiKey && typeof settings.apiKey === 'string' && settings.apiKey.trim().length > 0) {
+    console.log('[PII Blocker] getModifiedPrompt: Adding Authorization header');
     headers['Authorization'] = `Bearer ${settings.apiKey}`;
+  } else {
+    console.log('[PII Blocker] getModifiedPrompt: Skipping Authorization header (Ollama mode)');
   }
 
   const body = JSON.stringify({
@@ -202,21 +372,129 @@ async function getModifiedPrompt(text) {
   });
 
   try {
-    const response = await fetch(settings.apiUrl, {
+    const apiUrl = getChatCompletionsUrl(settings.apiUrl);
+    console.log('[PII Blocker] Calling LLM API for prompt modification:', {
+      url: apiUrl,
+      hasAuth: !!headers['Authorization'],
+      model: settings.modelName
+    });
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: headers,
       body: body
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      console.error('[PII Blocker] LLM API error in getModifiedPrompt:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: apiUrl,
+        errorBody: errorText,
+        hasAuth: !!headers['Authorization']
+      });
       throw new Error(`LLM API error: ${response.status}`);
     }
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content?.trim() || redactSensitiveData(text);
   } catch (error) {
-    console.error('Error getting modified prompt:', error);
+    console.warn('LLM unavailable, using regex redaction:', error.message);
     return redactSensitiveData(text);
+  }
+}
+
+// Test chat completion endpoint directly
+async function testChatCompletion(baseUrl, apiKey, model) {
+  const headers = { 'Content-Type': 'application/json' };
+
+  console.log('[PII Blocker] testChatCompletion - API key check:', {
+    apiKeyType: typeof apiKey,
+    apiKeyValue: apiKey,
+    apiKeyLength: apiKey ? apiKey.length : 0,
+    isEmpty: !apiKey || apiKey.trim().length === 0
+  });
+
+  // Only add Authorization header if API key exists and is not empty
+  // Ollama does NOT require auth and will reject requests with Authorization header (403)
+  if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
+    console.log('[PII Blocker] Adding Authorization header');
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  } else {
+    console.log('[PII Blocker] Skipping Authorization header (no API key or empty)');
+  }
+
+  const chatUrl = getChatCompletionsUrl(baseUrl);
+
+  const body = JSON.stringify({
+    model: model,
+    messages: [
+      { role: 'system', content: 'You are a test assistant.' },
+      { role: 'user', content: 'Say "OK" if you can read this.' }
+    ],
+    max_tokens: 10,
+    temperature: 0
+  });
+
+  console.log('[PII Blocker] Testing chat completion endpoint:', {
+    url: chatUrl,
+    model: model,
+    headers: headers,
+    hasAuth: !!headers['Authorization']
+  });
+
+  try {
+    const response = await fetch(chatUrl, {
+      method: 'POST',
+      headers: headers,
+      body: body,
+      mode: 'cors',
+      credentials: 'omit'
+    });
+
+    console.log('[PII Blocker] Fetch response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries([...response.headers.entries()])
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unable to read error');
+      console.error('[PII Blocker] Chat completion test failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText,
+        responseHeaders: Object.fromEntries([...response.headers.entries()]),
+        hasAuth: !!headers['Authorization']
+      });
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        details: errorText
+      };
+    }
+
+    const data = await response.json();
+    const responseText = data.choices?.[0]?.message?.content || '';
+
+    console.log('[PII Blocker] Chat completion test succeeded:', {
+      response: responseText,
+      model: data.model
+    });
+
+    return {
+      success: true,
+      message: 'Chat completion endpoint working!',
+      response: responseText,
+      modelUsed: data.model
+    };
+  } catch (error) {
+    console.error('[PII Blocker] Chat completion test exception:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
@@ -282,14 +560,21 @@ async function testLlmConnection(url, apiKey, model) {
 }
 
 // Main check function
-async function checkSensitiveData(text) {
+async function checkSensitiveData(text, platform = null) {
+  // Ensure settings are loaded before processing
+  if (!settingsLoaded) {
+    await loadSettings();
+  }
+
   // First, check with regex (fast)
   const regexResult = checkRegex(text);
 
   if (regexResult.sensitive) {
     // Definitely sensitive, get modified prompt
     const modified_prompt = await getModifiedPrompt(text);
-    return { sensitive: true, modified_prompt };
+    // Update metrics with detected PII type and platform
+    updateMetrics(true, regexResult.type, platform);
+    return { sensitive: true, modified_prompt, detectedType: regexResult.type };
   }
 
   // If LLM is enabled, also check with LLM for more nuanced detection
@@ -298,13 +583,17 @@ async function checkSensitiveData(text) {
       const llmSensitive = await checkWithLlm(text);
       if (llmSensitive) {
         const modified_prompt = await getModifiedPrompt(text);
-        return { sensitive: true, modified_prompt };
+        // Update metrics - LLM detected something regex didn't
+        updateMetrics(true, 'AI Detected', platform);
+        return { sensitive: true, modified_prompt, detectedType: 'AI Detected' };
       }
     } catch (error) {
-      console.error('LLM check failed, falling back to regex only:', error);
-      // If LLM fails, we already did regex check
+      console.warn('LLM check failed (regex already ran and found nothing):', error.message);
+      // If LLM fails, we already did regex check - continue with regex result
     }
   }
 
+  // No sensitive data detected, still update metrics for prompts checked
+  updateMetrics(false, null, platform);
   return { sensitive: false, modified_prompt: null };
 }

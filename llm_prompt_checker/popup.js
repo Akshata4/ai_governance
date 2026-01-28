@@ -11,14 +11,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const testBtn = document.getElementById('testBtn');
   const status = document.getElementById('status');
 
+  // Metrics elements
+  const totalChecked = document.getElementById('totalChecked');
+  const totalBlocked = document.getElementById('totalBlocked');
+  const piiTypesList = document.getElementById('piiTypesList');
+  const platformList = document.getElementById('platformList');
+  const lastDetection = document.getElementById('lastDetection');
+  const resetMetricsBtn = document.getElementById('resetMetrics');
+
+  // Load and display metrics
+  loadMetrics();
+
   // Load saved settings
   chrome.storage.sync.get({
     enabled: true,
     useLlm: false,
     apiUrl: 'http://localhost:11434/v1/',
-    apiKey: '123abc',
+    apiKey: '',
     modelName: 'llama3'
   }, (items) => {
+    console.log('[PII Blocker Popup] Loaded settings from storage:', {
+      enabled: items.enabled,
+      useLlm: items.useLlm,
+      apiUrl: items.apiUrl,
+      apiKey: items.apiKey ? `[${items.apiKey.length} chars]: "${items.apiKey}"` : '[EMPTY]',
+      modelName: items.modelName
+    });
+
     enabledToggle.checked = items.enabled;
     useLlmToggle.checked = items.useLlm;
     apiUrl.value = items.apiUrl;
@@ -43,6 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
       apiKey: apiKey.value.trim(),
       modelName: modelName.value.trim()
     };
+
+    console.log('[PII Blocker Popup] Saving settings:', {
+      enabled: settings.enabled,
+      useLlm: settings.useLlm,
+      apiUrl: settings.apiUrl,
+      apiKey: settings.apiKey ? `[${settings.apiKey.length} chars]: "${settings.apiKey}"` : '[EMPTY]',
+      modelName: settings.modelName
+    });
 
     chrome.storage.sync.set(settings, () => {
       showStatus('Settings saved!', 'success');
@@ -108,4 +135,102 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     });
   }
+
+  // Test chat completion endpoint via background script
+  // Load and display metrics
+  function loadMetrics() {
+    chrome.runtime.sendMessage({ action: 'getMetrics' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.success) {
+        return;
+      }
+
+      const metrics = response.metrics;
+      updateMetricsDisplay(metrics);
+    });
+  }
+
+  // Update the metrics display
+  function updateMetricsDisplay(metrics) {
+    totalChecked.textContent = metrics.totalPromptsChecked || 0;
+    totalBlocked.textContent = metrics.totalPiiDetected || 0;
+
+    // Update PII breakdown
+    const piiByType = metrics.piiByType || {};
+    const types = Object.keys(piiByType);
+
+    if (types.length > 0) {
+      piiTypesList.innerHTML = types
+        .sort((a, b) => piiByType[b] - piiByType[a])
+        .map(type => `
+          <div class="pii-type">
+            <span class="pii-type-name">${type}</span>
+            <span class="pii-type-count">${piiByType[type]}</span>
+          </div>
+        `)
+        .join('');
+    } else {
+      piiTypesList.innerHTML = `
+        <div class="pii-type">
+          <span class="pii-type-name">No detections yet</span>
+        </div>
+      `;
+    }
+
+    // Update platform usage breakdown
+    const platformUsage = metrics.platformUsage || {};
+    const platforms = Object.keys(platformUsage);
+
+    if (platforms.length > 0) {
+      platformList.innerHTML = platforms
+        .sort((a, b) => platformUsage[b] - platformUsage[a])
+        .map(platform => `
+          <div class="pii-type">
+            <span class="pii-type-name">${platform}</span>
+            <span class="platform-count">${platformUsage[platform]}</span>
+          </div>
+        `)
+        .join('');
+    } else {
+      platformList.innerHTML = `
+        <div class="pii-type">
+          <span class="pii-type-name">No usage yet</span>
+        </div>
+      `;
+    }
+
+    // Update last detection time
+    if (metrics.lastDetectionTime) {
+      const date = new Date(metrics.lastDetectionTime);
+      lastDetection.textContent = `Last detection: ${formatTimeAgo(date)}`;
+    } else {
+      lastDetection.textContent = 'No detections recorded';
+    }
+  }
+
+  // Format time ago
+  function formatTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffDay > 0) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+    if (diffHour > 0) return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+    if (diffMin > 0) return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+    return 'Just now';
+  }
+
+  // Reset metrics
+  resetMetricsBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to reset all metrics?')) {
+      chrome.runtime.sendMessage({ action: 'resetMetrics' }, (response) => {
+        if (response && response.success) {
+          updateMetricsDisplay(response.metrics);
+          showStatus('Metrics reset!', 'success');
+        }
+      });
+    }
+  });
 });

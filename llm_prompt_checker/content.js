@@ -2,6 +2,24 @@
 let checking = false;
 let blockSubmission = false;
 
+// Detect which platform we're on
+function detectPlatform() {
+  const hostname = window.location.hostname;
+  if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) {
+    return 'ChatGPT';
+  } else if (hostname.includes('claude.ai')) {
+    return 'Claude';
+  } else if (hostname.includes('gemini.google.com')) {
+    return 'Gemini';
+  } else if (hostname.includes('perplexity.ai')) {
+    return 'Perplexity';
+  } else if (hostname.includes('bard.google.com')) {
+    return 'Bard';
+  } else {
+    return 'Other';
+  }
+}
+
 function showBlockingWarning(modifiedPrompt = null) {
   const existing = document.querySelector('.pii-blocker-overlay');
   if (existing) existing.remove();
@@ -120,8 +138,9 @@ async function checkSensitiveData(text) {
     }
 
     try {
+      const platform = detectPlatform();
       chrome.runtime.sendMessage(
-        { action: 'checkSensitiveData', text: text },
+        { action: 'checkSensitiveData', text: text, platform: platform },
         (response) => {
           if (chrome.runtime.lastError) {
             console.error('PII Checker: Message error', chrome.runtime.lastError);
