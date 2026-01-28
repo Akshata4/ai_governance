@@ -3,8 +3,8 @@
   "name": "LLM Prompt PII Blocker",
   "version": "1.0",
   "description": "Blocks sensitive/confidential data from being sent to LLMs",
-  "permissions": ["activeTab", "storage", "http://localhost/*", "127.0.0.1/*"],
-  "host_permissions": ["<all_urls>", "http://localhost/*", "127.0.0.1/*"],
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "PII Blocker Settings"

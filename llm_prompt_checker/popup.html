@@ -229,6 +229,75 @@
       color: #666;
       margin-top: 2px;
     }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .metric-item {
+      background: #333;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .metric-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #4CAF50;
+    }
+    .metric-value.warning {
+      color: #ff6b6b;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: #888;
+      margin-top: 4px;
+    }
+    .pii-breakdown {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+    }
+    .pii-breakdown-title {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .pii-type {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 12px;
+      border-bottom: 1px solid #333;
+    }
+    .pii-type:last-child {
+      border-bottom: none;
+    }
+    .pii-type-name {
+      color: #ccc;
+    }
+    .pii-type-count {
+      color: #ff6b6b;
+      font-weight: 600;
+    }
+    .last-detection {
+      font-size: 11px;
+      color: #666;
+      margin-top: 12px;
+      text-align: center;
+    }
+    .btn-reset {
+      background: transparent;
+      border: 1px solid #444;
+      color: #888;
+      font-size: 11px;
+      padding: 6px 12px;
+      margin-top: 12px;
+    }
+    .btn-reset:hover {
+      border-color: #666;
+      color: #ccc;
+    }
   </style>
 </head>
 <body>
@@ -261,6 +330,40 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon warning">📊</div>
+      <div>
+        <div class="card-title">Detection Metrics</div>
+        <div class="card-desc">Your protection statistics</div>
+      </div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-item">
+        <div class="metric-value" id="totalChecked">0</div>
+        <div class="metric-label">Prompts Checked</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-value warning" id="totalBlocked">0</div>
+        <div class="metric-label">PII Blocked</div>
+      </div>
+    </div>
+
+    <div class="pii-breakdown" id="piiBreakdown">
+      <div class="pii-breakdown-title">Detection Breakdown</div>
+      <div id="piiTypesList">
+        <div class="pii-type">
+          <span class="pii-type-name">No detections yet</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="last-detection" id="lastDetection">No detections recorded</div>
+
+    <button class="btn btn-reset" id="resetMetrics">Reset Metrics</button>
+  </div>
+
   <div class="card llm-config" id="llmConfig">
     <div class="card-header">
       <div class="card-icon settings">⚙️</div>
@@ -279,7 +382,9 @@
     <label>Model Name</label>
     <input type="text" id="modelName" placeholder="llama3">
 
-    <button class="btn btn-secondary" id="testBtn">Test Connection</button>
+    <button class="btn btn-secondary" id="testBtn">Test Connection (/models)</button>
+    <button class="btn btn-secondary" id="testChatBtn">Test Chat Endpoint</button>
+    <button class="btn btn-secondary" id="clearApiKeyBtn" style="background: #ff4444; color: white; margin-top: 12px;">Force Clear API Key</button>
   </div>
 
   <button class="btn btn-primary" id="saveBtn">Save Settings</button>
