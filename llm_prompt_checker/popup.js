@@ -9,14 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const modelName = document.getElementById('modelName');
   const saveBtn = document.getElementById('saveBtn');
   const testBtn = document.getElementById('testBtn');
-  const testChatBtn = document.getElementById('testChatBtn');
-  const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
   const status = document.getElementById('status');
 
   // Metrics elements
   const totalChecked = document.getElementById('totalChecked');
   const totalBlocked = document.getElementById('totalBlocked');
   const piiTypesList = document.getElementById('piiTypesList');
+  const platformList = document.getElementById('platformList');
   const lastDetection = document.getElementById('lastDetection');
   const resetMetricsBtn = document.getElementById('resetMetrics');
 
@@ -110,64 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Test chat completions endpoint
-  testChatBtn.addEventListener('click', async () => {
-    if (!useLlmToggle.checked) {
-      showStatus('LLM is disabled. Enable it to test.', 'error');
-      return;
-    }
-
-    const url = apiUrl.value.trim();
-    const key = apiKey.value.trim();
-    const model = modelName.value.trim();
-
-    console.log('[PII Blocker Popup] Testing chat endpoint with:', {
-      url: url,
-      apiKey: key ? `[${key.length} chars]: "${key}"` : '[EMPTY]',
-      model: model
-    });
-
-    if (!url || !model) {
-      showStatus('Please enter API URL and Model Name', 'error');
-      return;
-    }
-
-    showStatus('Testing chat completions endpoint...', 'success');
-
-    try {
-      const response = await testChatCompletion(url, key, model);
-      if (response.success) {
-        showStatus(`Chat endpoint working! Response: "${response.response}"`, 'success');
-      } else {
-        showStatus('Chat endpoint failed: ' + response.error + (response.details ? ' - ' + response.details : ''), 'error');
-      }
-    } catch (error) {
-      showStatus('Chat endpoint failed: ' + error.message, 'error');
-    }
-  });
-
-  // Force clear API key
-  clearApiKeyBtn.addEventListener('click', () => {
-    console.log('[PII Blocker Popup] Force clearing API key');
-    apiKey.value = '';
-
-    chrome.storage.sync.set({ apiKey: '' }, () => {
-      showStatus('API key cleared! Click Save Settings to apply.', 'success');
-
-      // Notify background script
-      chrome.runtime.sendMessage({
-        action: 'settingsUpdated',
-        settings: {
-          enabled: enabledToggle.checked,
-          useLlm: useLlmToggle.checked,
-          apiUrl: apiUrl.value.trim(),
-          apiKey: '',
-          modelName: modelName.value.trim()
-        }
-      });
-    });
-  });
-
   function showStatus(message, type) {
     status.textContent = message;
     status.className = 'status ' + type;
@@ -196,21 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Test chat completion endpoint via background script
-  function testChatCompletion(apiUrl, key, model) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { action: 'testChatCompletion', apiUrl: apiUrl, apiKey: key, model: model },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            resolve({ success: false, error: chrome.runtime.lastError.message });
-          } else {
-            resolve(response || { success: false, error: 'No response from background script' });
-          }
-        }
-      );
-    });
-  }
-
   // Load and display metrics
   function loadMetrics() {
     chrome.runtime.sendMessage({ action: 'getMetrics' }, (response) => {
@@ -246,6 +172,28 @@ document.addEventListener('DOMContentLoaded', () => {
       piiTypesList.innerHTML = `
         <div class="pii-type">
           <span class="pii-type-name">No detections yet</span>
+        </div>
+      `;
+    }
+
+    // Update platform usage breakdown
+    const platformUsage = metrics.platformUsage || {};
+    const platforms = Object.keys(platformUsage);
+
+    if (platforms.length > 0) {
+      platformList.innerHTML = platforms
+        .sort((a, b) => platformUsage[b] - platformUsage[a])
+        .map(platform => `
+          <div class="pii-type">
+            <span class="pii-type-name">${platform}</span>
+            <span class="platform-count">${platformUsage[platform]}</span>
+          </div>
+        `)
+        .join('');
+    } else {
+      platformList.innerHTML = `
+        <div class="pii-type">
+          <span class="pii-type-name">No usage yet</span>
         </div>
       `;
     }

@@ -280,6 +280,10 @@
       color: #ff6b6b;
       font-weight: 600;
     }
+    .platform-count {
+      color: #64b5f6;
+      font-weight: 600;
+    }
     .last-detection {
       font-size: 11px;
       color: #666;
@@ -359,6 +363,15 @@
       </div>
     </div>
 
+    <div class="pii-breakdown" id="platformBreakdown">
+      <div class="pii-breakdown-title">Platform Usage</div>
+      <div id="platformList">
+        <div class="pii-type">
+          <span class="pii-type-name">No usage yet</span>
+        </div>
+      </div>
+    </div>
+
     <div class="last-detection" id="lastDetection">No detections recorded</div>
 
     <button class="btn btn-reset" id="resetMetrics">Reset Metrics</button>
@@ -382,9 +395,7 @@
     <label>Model Name</label>
     <input type="text" id="modelName" placeholder="llama3">
 
-    <button class="btn btn-secondary" id="testBtn">Test Connection (/models)</button>
-    <button class="btn btn-secondary" id="testChatBtn">Test Chat Endpoint</button>
-    <button class="btn btn-secondary" id="clearApiKeyBtn" style="background: #ff4444; color: white; margin-top: 12px;">Force Clear API Key</button>
+    <button class="btn btn-secondary" id="testBtn">Test Connection</button>
   </div>
 
   <button class="btn btn-primary" id="saveBtn">Save Settings</button>

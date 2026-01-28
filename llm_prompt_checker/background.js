@@ -14,6 +14,7 @@ let metrics = {
   totalPromptsChecked: 0,
   totalPiiDetected: 0,
   piiByType: {},
+  platformUsage: {},
   blockedSubmissions: 0,
   lastDetectionTime: null,
   sessionStart: Date.now()
@@ -63,8 +64,13 @@ function saveMetrics() {
 }
 
 // Update metrics when PII is detected
-function updateMetrics(detected, piiType = null) {
+function updateMetrics(detected, piiType = null, platform = null) {
   metrics.totalPromptsChecked++;
+
+  // Track platform usage
+  if (platform) {
+    metrics.platformUsage[platform] = (metrics.platformUsage[platform] || 0) + 1;
+  }
 
   if (detected) {
     metrics.totalPiiDetected++;
@@ -106,6 +112,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       totalPromptsChecked: 0,
       totalPiiDetected: 0,
       piiByType: {},
+      platformUsage: {},
       blockedSubmissions: 0,
       lastDetectionTime: null,
       sessionStart: Date.now()
@@ -139,7 +146,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
     }
 
-    checkSensitiveData(request.text)
+    checkSensitiveData(request.text, request.platform)
       .then(result => sendResponse(result))
       .catch(error => {
         console.error('Background: Check error', error);
@@ -553,7 +560,7 @@ async function testLlmConnection(url, apiKey, model) {
 }
 
 // Main check function
-async function checkSensitiveData(text) {
+async function checkSensitiveData(text, platform = null) {
   // Ensure settings are loaded before processing
   if (!settingsLoaded) {
     await loadSettings();
@@ -565,8 +572,8 @@ async function checkSensitiveData(text) {
   if (regexResult.sensitive) {
     // Definitely sensitive, get modified prompt
     const modified_prompt = await getModifiedPrompt(text);
-    // Update metrics with detected PII type
-    updateMetrics(true, regexResult.type);
+    // Update metrics with detected PII type and platform
+    updateMetrics(true, regexResult.type, platform);
     return { sensitive: true, modified_prompt, detectedType: regexResult.type };
   }
 
@@ -577,16 +584,16 @@ async function checkSensitiveData(text) {
       if (llmSensitive) {
         const modified_prompt = await getModifiedPrompt(text);
         // Update metrics - LLM detected something regex didn't
-        updateMetrics(true, 'AI Detected');
+        updateMetrics(true, 'AI Detected', platform);
         return { sensitive: true, modified_prompt, detectedType: 'AI Detected' };
       }
     } catch (error) {
-      console.error('LLM check failed, falling back to regex only:', error);
-      // If LLM fails, we already did regex check
+      console.warn('LLM check failed (regex already ran and found nothing):', error.message);
+      // If LLM fails, we already did regex check - continue with regex result
     }
   }
 
   // No sensitive data detected, still update metrics for prompts checked
-  updateMetrics(false);
+  updateMetrics(false, null, platform);
   return { sensitive: false, modified_prompt: null };
 }
